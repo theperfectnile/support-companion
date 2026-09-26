@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Support Companion</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#111; color:#eee; margin:0; padding:0; }
+    header { padding:16px; background:#222; text-align:center; }
+    main { padding:16px; }
+    .tabs { display:flex; gap:8px; margin-bottom:16px; }
+    .tab-btn { flex:1; padding:10px; background:#333; border:none; color:#eee; cursor:pointer; }
+    .tab-btn.active { background:#555; }
+    .section { display:none; }
+    .section.active { display:block; }
+    button { padding:8px 12px; margin:4px 0; background:#444; border:none; color:#eee; cursor:pointer; }
+    button.danger { background:#b33; }
+    input, textarea { width:100%; padding:8px; margin:4px 0; background:#222; border:1px solid #444; color:#eee; }
+    .card { border:1px solid #444; padding:10px; margin:6px 0; border-radius:4px; }
+    small { color:#aaa; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Support Companion</h1>
+    <p>For one person, with care.</p>
+  </header>
+
+  <main>
+    <div class="tabs">
+      <button class="tab-btn active" data-target="today">Today</button>
+      <button class="tab-btn" data-target="quiet">Quiet Space</button>
+      <button class="tab-btn" data-target="plan">Plan</button>
+    </div>
+
+    <!-- Today: daily check-in -->
+    <section id="today" class="section active">
+      <h2>How are you feeling today?</h2>
+      <p>Tap one. No pressure, no judgment.</p>
+      <button onclick="setMood('okay')">Okay</button>
+      <button onclick="setMood('low')">Low</button>
+      <button class="danger" onclick="setMood('really bad')">Really bad</button>
+      <div id="todayStatus"></div>
+      <h3>Recent days</h3>
+      <div id="moodHistory"></div>
+    </section>
+
+    <!-- Quiet Space: journal + I need you -->
+    <section id="quiet" class="section">
+      <h2>Quiet Space</h2>
+      <p>Write anything. This is just for you.</p>
+      <textarea id="journalText" rows="6" placeholder="Type whatever you want here..."></textarea>
+      <button onclick="saveJournal()">Save entry</button>
+      <div id="journalStatus"></div>
+
+      <h3>I need you</h3>
+      <p>Press this if you want Sean to know you need him.</p>
+      <button class="danger" onclick="needYou()">Send “I need you” signal</button>
+      <div id="needYouStatus"></div>
+
+      <h3>Grounding exercises</h3>
+      <div class="card">
+        <strong>5 things you can see</strong>
+        <p>Look around and name 5 things you can see. Say them out loud or in your head.</p>
+      </div>
+      <div class="card">
+        <strong>5 slow breaths</strong>
+        <p>Inhale slowly for 4 seconds, exhale for 6. Repeat 5 times.</p>
+      </div>
+      <div class="card">
+        <strong>Feel your body</strong>
+        <p>Press your feet into the floor. Notice the pressure, the temperature, the contact.</p>
+      </div>
+    </section>
+
+    <!-- Plan: appointments + meds -->
+    <section id="plan" class="section">
+      <h2>Plan</h2>
+      <p>Just the essentials. You don’t have to manage this alone.</p>
+
+      <h3>Add appointment</h3>
+      <input id="apptTitle" placeholder="Appointment (e.g., Oncologist visit)">
+      <input id="apptDate" type="date">
+      <input id="apptTime" type="time">
+      <button onclick="addAppointment()">Add appointment</button>
+
+      <h3>Appointments</h3>
+      <div id="appointmentsList"></div>
+
+      <h3>Add medication</h3>
+      <input id="medName" placeholder="Medication name">
+      <input id="medTime" type="time">
+      <button onclick="addMedication()">Add medication</button>
+
+      <h3>Medications</h3>
+      <div id="medsList"></div>
+
+      <small>Idea: Sean can be the one updating this when you're too tired.</small>
+    </section>
+  </main>
+
+  <script>
+    // Tab switching
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const sections = document.querySelectorAll('.section');
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabButtons.forEach(b => b.classList.remove('active'));
+        sections.forEach(s => s.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.target).classList.add('active');
+      });
+    });
+
+    // Storage helpers
+    function loadData(key, fallback) {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : fallback;
+      } catch {
+        return fallback;
+      }
+    }
+    function saveData(key, value) {
+      localStorage.setItem(key, JSON.stringify(value));
+    }
+
+    // Mood tracking
+    function setMood(mood) {
+      const today = new Date().toISOString().slice(0,10);
+      const moods = loadData('moods', []);
+      moods.push({ date: today, mood });
+      saveData('moods', moods);
+      document.getElementById('todayStatus').textContent =
+        `Saved: today you feel "${mood}".`;
+      renderMoodHistory();
+      if (mood === 'really bad') {
+        // This is where you’d later hook in email/SMS notification.
+        console.log('ALERT: really bad day flagged for Sean.');
+      }
+    }
+
+    function renderMoodHistory() {
+      const moods = loadData('moods', []);
+      const container = document.getElementById('moodHistory');
+      container.innerHTML = '';
+      moods.slice(-7).forEach(entry => {
+        const div = document.createElement('div');
+        div.textContent = `${entry.date}: ${entry.mood}`;
+        container.appendChild(div);
+      });
+    }
+
+    // Journal
+    function saveJournal() {
+      const text = document.getElementById('journalText').value.trim();
+      if (!text) {
+        document.getElementById('journalStatus').textContent =
+          'Nothing written yet. That’s okay.';
+        return;
+      }
+      const entries = loadData('journal', []);
+      entries.push({ date: new Date().toISOString(), text });
+      saveData('journal', entries);
+      document.getElementById('journalStatus').textContent =
+        'Saved. You don’t have to read this again if you don’t want to.';
+      document.getElementById('journalText').value = '';
+    }
+
+    // “I need you” signal
+    function needYou() {
+      const signals = loadData('needYouSignals', []);
+      signals.push({ date: new Date().toISOString() });
+      saveData('needYouSignals', signals);
+      document.getElementById('needYouStatus').textContent =
+        'Signal sent. Sean will see this when he checks.';
+      console.log('SIGNAL: she pressed “I need you”.');
+    }
+
+    // Appointments
+    function addAppointment() {
+      const title = document.getElementById('apptTitle').value.trim();
+      const date = document.getElementById('apptDate').value;
+      const time = document.getElementById('apptTime').value;
+      if (!title || !date || !time) return;
+      const appts = loadData('appointments', []);
+      appts.push({ title, date, time });
+      saveData('appointments', appts);
+      document.getElementById('apptTitle').value = '';
+      document.getElementById('apptDate').value = '';
+      document.getElementById('apptTime').value = '';
+      renderAppointments();
+    }
+
+    function renderAppointments() {
+      const appts = loadData('appointments', []);
+      const container = document.getElementById('appointmentsList');
+      container.innerHTML = '';
+      appts.forEach(a => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.textContent = `${a.date} ${a.time} — ${a.title}`;
+        container.appendChild(div);
+      });
+    }
+
+    // Medications
+    function addMedication() {
+      const name = document.getElementById('medName').value.trim();
+      const time = document.getElementById('medTime').value;
+      if (!name || !time) return;
+      const meds = loadData('meds', []);
+      meds.push({ name, time });
+      saveData('meds', meds);
+      document.getElementById('medName').value = '';
+      document.getElementById('medTime').value = '';
+      renderMeds();
+    }
+
+    function renderMeds() {
+      const meds = loadData('meds', []);
+      const container = document.getElementById('medsList');
+      container.innerHTML = '';
+      meds.forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.textContent = `${m.time} — ${m.name}`;
+        container.appendChild(div);
+      });
+    }
+
+    // Initial render
+    renderMoodHistory();
+    renderAppointments();
+    renderMeds();
+  </script>
+</body>
+</html>
